@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desafio 04 — Django + PostgreSQL + Docker</title>
+  <style>
+    :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --ok:#4ade80; --bad:#f87171; --accent:#38bdf8; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+    main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { margin-bottom: 4px; }
+    .sub { color: var(--muted); margin-top: 0; }
+    .card { background: var(--card); border-radius: 12px; padding: 20px 24px; margin: 20px 0; }
+    h2 { margin-top: 0; font-size: 1.15rem; color: var(--accent); }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; word-break: break-all; }
+    code { background: #0f172a; padding: 1px 6px; border-radius: 4px; }
+    pre { background:#0f172a; padding:12px 14px; border-radius:8px; overflow-x:auto; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+    a { color: var(--accent); }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🐳 Desafio 04</h1>
+  <p class="sub">Django + PostgreSQL + Docker — dois containers conversando pela mesma rede.</p>
+
+  <section class="card">
+    <h2>Ao vivo: o que este container está vendo</h2>
+    <dl>
+      <dt>Container (hostname)</dt><dd>{{ container_id }}</dd>
+      <dt>Processo Gunicorn (PID)</dt><dd>{{ python_pid }}</dd>
+      <dt>DEBUG</dt><dd>{{ debug }}</dd>
+      <dt>Banco (host:porta)</dt><dd>{{ db_host }}:{{ db_port }}</dd>
+      <dt>Banco / usuário</dt><dd>{{ db_name }} / {{ db_user }}</dd>
+      <dt>Conexão com Postgres</dt>
+      <dd>{% if db_ok %}<span class="ok">● conectado</span>{% else %}<span class="bad">● falhou</span>{% endif %}</dd>
+      <dt>{% if db_ok %}Versão{% else %}Erro{% endif %}</dt><dd>{{ db_version }}</dd>
+    </dl>
+    <p><a href="/admin/">Ir para o Django Admin →</a></p>
+  </section>
+
+  <section class="card">
+    <h2>1. Imagem × Container</h2>
+    <p>O <code>Dockerfile</code> é a receita; <code>docker build</code> gera a <b>imagem</b> (imutável).
+    <code>docker run</code> cria um <b>container</b> a partir dela. O hostname acima é o ID do container —
+    recrie o container e ele muda.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Rede: por que <code>DB_HOST=postgres-desafio4</code>?</h2>
+    <p>Dentro de uma <b>docker network</b> customizada, o Docker resolve o <b>nome do container</b> como DNS.
+    Por isso o Django acha o banco pelo nome, e não por <code>localhost</code> (que dentro do container
+    aponta para ele mesmo).</p>
+<pre>docker network create desafio4_net
+docker run -d --name postgres-desafio4 --network desafio4_net \
+  -e POSTGRES_DB=desafio4_db -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=... \
+  -v desafio4-pgdata:/var/lib/postgresql/data postgres
+docker run -d --network desafio4_net -p 8007:8000 --env-file .env desafio4-django</pre>
+  </section>
+
+  <section class="card">
+    <h2>3. Volume: persistência</h2>
+    <p>O sistema de arquivos do container some com ele. O volume <code>desafio4-pgdata</code> guarda
+    <code>/var/lib/postgresql/data</code> fora do container: você pode apagar e recriar o Postgres e
+    seus dados (inclusive o superuser) continuam lá.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Variáveis de ambiente</h2>
+    <p>O <code>.env</code> não vai para a imagem (está no <code>.dockerignore</code>); ele é injetado em
+    tempo de execução com <code>--env-file</code>. O <code>settings.py</code> lê tudo com
+    <code>os.environ</code>. Assim a mesma imagem roda em qualquer ambiente.</p>
+  </section>
+
+  <section class="card">
+    <h2>5. Arquivos estáticos (o bug do admin)</h2>
+    <p>Com <code>DEBUG=0</code> o Django não serve <code>/static/</code>, e o Gunicorn também não.
+    O <code>collectstatic</code> (rodado no build) reúne os arquivos em <code>STATIC_ROOT</code>, e o
+    <b>WhiteNoise</b> no <code>MIDDLEWARE</code> os serve. Esta página está estilizada inline justamente
+    para não depender disso; o admin depende.</p>
+  </section>
+
+  <section class="card">
+    <h2>Comandos úteis</h2>
+<pre>docker exec -it &lt;container-django&gt; python manage.py migrate
+docker exec -it &lt;container-django&gt; python manage.py createsuperuser
+docker logs -f &lt;container&gt;
+docker volume ls / docker network inspect desafio4_net</pre>
+  </section>
+</main>
+</body>
+</html>
