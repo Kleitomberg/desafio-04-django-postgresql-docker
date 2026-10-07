@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.pyc
+
+# Virtual environment
+.venv
+venv
+env
+
+# Environment variables
+.env
+.env.*
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Documentation
+README.md
